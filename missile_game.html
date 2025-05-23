@@ -706,7 +706,7 @@
                     burningEffectsActive = true;
                 } else if (this.health <= 50) {
                     this.color = CITY_COLOR_DAMAGED;
-                    this.height *= 0.8; // Reduce height by 20% when damaged
+                    this.height *= 0.6; // Reduce height by 40% when damaged
                     playSound('cityDamage', null, 0.1);
                 } else {
                     playSound('cityDamage', null, 0.08);
@@ -1018,6 +1018,12 @@
                 this.missilesLaunched = 0;
                 this.maxMissiles = 2 + Math.floor(wave / 3); // More missiles per airplane in later waves
                 this.engineSoundPlaying = false;
+
+                // Add deep motor buzz sound
+                if (soundEnabled && synths.airplaneEngine) {
+                    synths.airplaneEngine.triggerAttack();
+                    this.engineSoundPlaying = true;
+                }
             }
 
             update(deltaTime) {
@@ -1030,12 +1036,6 @@
                     this.alive = false;
                 } else if (this.direction === -1 && this.x < -200) {
                     this.alive = false;
-                }
-
-                // Play engine sound
-                if (!this.engineSoundPlaying && soundEnabled && synths.airplaneEngine) {
-                    synths.airplaneEngine.triggerAttack();
-                    this.engineSoundPlaying = true;
                 }
 
                 // Launch missiles
@@ -1053,8 +1053,8 @@
                 const missileSpeed = GAME_HEIGHT * ENEMY_MISSILE_BASE_SPEED_FACTOR * 0.8; // Slightly slower than ground missiles
                 const waveColorIndex = Math.min(currentWave - 1, WAVE_MISSILE_COLORS.length - 1);
                 const missileColor = WAVE_MISSILE_COLORS[waveColorIndex];
-                
-                enemyMissiles.push(new Missile(this.x, this.y + this.height/2, targetX, targetY, missileSpeed, missileColor, false, 'standard', false));
+
+                enemyMissiles.push(new Missile(this.x, this.y + this.height / 2, targetX, targetY, missileSpeed, missileColor, false, 'standard', false));
                 playSound('enemyLaunch');
             }
 
@@ -1062,7 +1062,7 @@
                 this.health--;
                 if (this.health <= 0) {
                     this.alive = false;
-                    
+
                     // Stop engine sound
                     if (this.engineSoundPlaying && soundEnabled && synths.airplaneEngine) {
                         synths.airplaneEngine.triggerRelease();
@@ -1073,7 +1073,7 @@
                     const explosionRadius = GAME_WIDTH * 0.08;
                     explosions.push(new Explosion(this.x, this.y, explosionRadius, 1000, '#FF6600', false));
                     playSound('airplaneExplosion');
-                    
+
                     // Award points
                     score += 50 * comboMultiplier;
                     updateScoreDisplay();
@@ -1089,188 +1089,42 @@
                     ctx.scale(-1, 1); // Flip horizontally for right-to-left movement
                 }
 
-                // Airplane body
+                // Fighter jet body
                 ctx.fillStyle = '#CCCCCC';
-                ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
-                
-                // Wings
-                ctx.fillStyle = '#999999';
-                ctx.fillRect(-this.width/3, -this.height, this.width/1.5, this.height/3);
-                
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height / 2); // Nose
+                ctx.lineTo(this.width / 2, 0); // Right wing
+                ctx.lineTo(0, this.height / 2); // Tail
+                ctx.lineTo(-this.width / 2, 0); // Left wing
+                ctx.closePath();
+                ctx.fill();
+
                 // Cockpit
                 ctx.fillStyle = '#4444AA';
-                ctx.fillRect(this.width/3, -this.height/3, this.width/6, this.height/2);
-                
+                ctx.fillRect(-this.width / 6, -this.height / 4, this.width / 3, this.height / 2);
+
                 // Engine glow
                 if (Math.floor(performance.now() / 100) % 3 === 0) {
                     ctx.fillStyle = '#FF6600';
-                    ctx.fillRect(-this.width/2 - 5, -this.height/4, 8, this.height/2);
+                    ctx.beginPath();
+                    ctx.arc(-this.width / 2, 0, this.height / 4, 0, Math.PI * 2);
+                    ctx.fill();
                 }
-
-                // Health indicator
-                ctx.strokeStyle = this.health > 1 ? '#00FF00' : '#FF0000';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
 
                 ctx.restore();
             }
         }
 
-        class BurningEffect {
-            constructor(x, y, width, height) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.particles = [];
-                this.startTime = performance.now();
-                this.duration = 4000; // 4 seconds
-                this.alive = true;
-                
-                // Create initial particles
-                for (let i = 0; i < 20; i++) {
-                    this.addParticle();
-                }
-            }
-            
-            addParticle() {
-                this.particles.push({
-                    x: this.x + (Math.random() - 0.5) * this.width,
-                    y: this.y - Math.random() * this.height * 0.5,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: -Math.random() * 3 - 1,
-                    size: Math.random() * 4 + 2,
-                    alpha: 0.8 + Math.random() * 0.2,
-                    decay: 0.008 + Math.random() * 0.004,
-                    color: Math.random() > 0.5 ? '#FF4400' : '#666666' // Fire and smoke colors
-                });
-            }
-
-            update(deltaTime) {
-                const elapsed = performance.now() - this.startTime;
-                if (elapsed > this.duration) {
-                    this.alive = false;
-                    return;
-                }
-
-                // Add new particles periodically
-                if (Math.random() < 0.3) {
-                    this.addParticle();
-                }
-
-                // Update existing particles
-                this.particles.forEach(p => {
-                    p.x += p.vx * deltaTime * 60;
-                    p.y += p.vy * deltaTime * 60;
-                    p.alpha -= p.decay;
-                    
-                    // Smoke particles rise and spread
-                    if (p.color === '#666666') {
-                        p.vy -= 0.1; // Rising smoke
-                        p.vx *= 1.02; // Spreading
-                    }
-                });
-
-                // Remove dead particles
-                this.particles = this.particles.filter(p => p.alpha > 0);
-            }
-
-            draw(ctx) {
-                if (!this.alive) return;
-
-                this.particles.forEach(p => {
-                    ctx.save();
-                    ctx.globalAlpha = p.alpha;
-                    ctx.fillStyle = p.color;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.restore();
-                });
-            }
-        }
-
-        // ---------------------------------------------
-        // III. GAME LOGIC
-        // ---------------------------------------------
-        
-        function initGame() { 
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId); 
-            }
-            
-            // Always reinitialize audio to ensure a clean state
-            initAudio();
-            
-            // Start the transport and music loop
-            Tone.Transport.start();
-            if (gameMusicLoop) {
-                gameMusicLoop.start(0);
-            }
-
-
-            isGameRunning = true;
-            isGameOver = false;
-            score = 0;
-            comboMultiplier = 1;
-            comboTimer = 0;
-            currentWave = 1;
-            currentEnergy = MAX_ENERGY;
-            selectedWeapon = 'standard';
-            weaponDisplay.textContent = 'STD';
-            comboDisplay.textContent = '1';
-
-            cities = [];
-            enemyMissiles = [];
-            playerMissiles = [];
-            explosions = [];
-            missilesToLaunchThisWave = 0;
-            launchTimer = 0;
-            currentLaunchInterval = LAUNCH_INTERVAL_BASE_MS;
-
-            initializeGameDimensions(); 
-            createStars(200);
-            createGrid();
-
-            const citySpacing = GAME_WIDTH / (NUM_CITIES + 1);
-            for (let i = 0; i < NUM_CITIES; i++) {
-                const cityX = citySpacing * (i + 1);
-                const cityY = BASE_Y;
-                cities.push(new City(cityX, cityY, CITY_WIDTH, CITY_HEIGHT));
-            }
-            updateCitiesRemainingDisplay();
-            
-            // Show game elements
-            canvas.style.display = 'block';
-            uiContainer.style.display = 'block';
-            energyBarContainer.style.display = 'block';
-            openingScreen.style.display = 'none';
-            
-            updateEnergyBar();
-            updateScoreDisplay();
-            updateWaveDisplay();
-            
-            startWave();
-            lastTime = performance.now();
-            animationFrameId = requestAnimationFrame(gameLoop);
-        }        function startWave() {
+        // Ensure only one airplane is launched at a time and make them rare
+        function startWave() {
             waveDisplay.textContent = currentWave;
             missilesToLaunchThisWave = MISSILES_PER_WAVE_BASE + (currentWave - 1) * MISSILES_PER_WAVE_INCREMENT;
-            launchTimer = 0; 
+            launchTimer = 0;
             currentLaunchInterval = Math.max(LAUNCH_INTERVAL_MIN_MS, LAUNCH_INTERVAL_BASE_MS - (currentWave - 1) * LAUNCH_INTERVAL_DECREMENT_MS);
             
-            // Spawn airplanes starting from wave 2, increasing chance each wave
-            if (currentWave >= 2) {
-                const airplaneChance = Math.min(0.7, 0.2 + (currentWave - 2) * 0.1);
-                if (Math.random() < airplaneChance) {
-                    const numAirplanes = Math.min(2, Math.floor(currentWave / 3) + 1);
-                    for (let i = 0; i < numAirplanes; i++) {
-                        // Delay each airplane spawn slightly
-                        setTimeout(() => {
-                            airplanes.push(new Airplane(currentWave));
-                        }, i * 3000); // 3 second delay between airplane spawns
-                    }
-                }
+            // Spawn airplanes starting from wave 2, with rare occurrences
+            if (currentWave >= 2 && Math.random() < 0.1 && airplanes.length === 0) {
+                airplanes.push(new Airplane(currentWave));
             }
         }
 
