@@ -1,6 +1,6 @@
 # Neon Defense
 
-Neon Defense is a missile defense game where players protect cities from incoming enemy missiles. The game features vibrant neon visuals and strategic gameplay.
+Neon Defense is a missile defense game where players protect cities from incoming enemy missiles. The game is a tribute to a classic game from the 80s.
 
 ## Features
 - Protect cities from waves of enemy missiles.
