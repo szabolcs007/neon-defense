@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missile Command: Neon Defense</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000011; /* Deep space blue */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Press Start 2P', cursive;
+            color: #00FF00; 
+        }
+        #gameCanvas {
+            border: 3px solid #FF00FF; /* Magenta border */
+            background-color: transparent; 
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges; /* Added for Edge 79+ support */
+            display: none; 
+            box-shadow: 0 0 20px #FF00FF, 0 0 35px #FF00FF inset;
+        }
+        #uiContainer {
+            position: absolute;
+            top: 10px; /* Adjusted for energy bar */
+            left: 15px;
+            font-size: clamp(10px, 1.5vw, 14px); /* Slightly smaller for more HUD elements */
+            background-color: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            border-radius: 0px; 
+            border: 2px solid #00FFFF; 
+            box-shadow: 0 0 8px #00FFFF;
+            z-index: 10;
+            display: none; 
+            color: #FFFF00; 
+        }
+        #uiContainer div {
+            margin-bottom: 4px;
+            white-space: nowrap;
+        }
+        #energyBarContainer {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30%;
+            height: 20px;
+            background-color: rgba(0,0,0,0.5);
+            border: 2px solid #00FFFF;
+            border-radius: 0px;
+            padding: 2px;
+            z-index: 10;
+            display: none; /* Hidden initially */
+        }
+        #energyBar {
+            width: 100%;
+            height: 100%;
+            background-color: #FF9900; /* Energy color */
+            transition: width 0.1s linear;
+        }
+        #gameOverScreen, #openingScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0,0,20,0.92);
+            padding: clamp(30px, 6vw, 60px);
+            border-radius: 0px;
+            border: 4px solid #FF00FF; 
+            box-shadow: 0 0 25px #FF00FF, 0 0 45px #FF00FF inset;
+            text-align: center;
+            z-index: 20;
+            color: #00FF00; 
+        }
+        #openingScreen {
+            display: flex; 
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #gameOverScreen {
+            display: none; 
+        }
+        #gameOverScreen h2, #openingScreen h1 {
+            margin-top: 0;
+            font-size: clamp(22px, 4.5vw, 36px);
+            text-shadow: 0 0 6px #FFFFFF, 0 0 12px #00FF00;
+            margin-bottom: 25px;
+        }
+         #openingScreen p {
+            font-size: clamp(11px, 1.8vw, 15px);
+            color: #00FFFF; 
+            margin-bottom: 35px;
+            line-height: 1.6;
+        }
+        #gameOverScreen p {
+            font-size: clamp(13px, 2.8vw, 19px);
+            margin-bottom: 12px;
+        }
+        #gameOverScreen button, #openingScreen button {
+            padding: clamp(12px, 2.2vw, 18px) clamp(22px, 4.5vw, 35px);
+            font-size: clamp(15px, 2.8vw, 22px);
+            font-family: 'Press Start 2P', cursive;
+            cursor: pointer;
+            background-color: #FF9900; 
+            color: #111111; 
+            border: 3px solid #FFFF00; 
+            border-radius: 0px;
+            margin-top: 25px;
+            transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+            text-shadow: none;
+            box-shadow: 0 0 12px #FF9900;
+        }
+        #gameOverScreen button:hover, #openingScreen button:hover {
+            background-color: #FFFF00; 
+            color: #000000;
+            box-shadow: 0 0 18px #FFFF00;
+            transform: scale(1.05);
+        }        #gameOverScreen button:active, #openingScreen button:active {
+            transform: scale(0.95);
+        }
+        
+        /* Controls box styling */
+        .controls-box {
+            margin-bottom: 25px;
+            line-height: 1.8;
+            text-align: left;
+            border: 1px solid #00FFFF;
+            padding: 15px;
+            background: rgba(0,40,80,0.4);
+            box-shadow: 0 0 8px #00FFFF inset;
+        }
+        
+        .controls-title {
+            margin-bottom: 10px;
+            color: #FFFF00;
+            text-align: center;
+            text-decoration: underline;
+            font-size: clamp(12px, 2vw, 16px);
+        }
+        
+        .control-item {
+            margin-bottom: 10px;
+            font-size: clamp(10px, 1.6vw, 14px);
+            color: #00FFFF;
+        }
+        
+        .key-highlight {
+            color: #FF00FF;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>    <div id="openingScreen">
+        <h1>MISSILE DEFENDER</h1>
+        <p>NEON DEFENSE PROTOCOL ACTIVATED!<br>DEFEND THE CITIES AT ALL COSTS!</p>
+        <div class="controls-box">
+            <p class="controls-title">CONTROLS</p>
+            <p class="control-item"><span class="key-highlight">MOUSE:</span> Click anywhere to launch missile at target</p>
+            <p class="control-item"><span class="key-highlight">1 KEY:</span> Select Standard Missile (STD) - Cost: 15 energy</p>
+            <p class="control-item"><span class="key-highlight">2 KEY:</span> Select Power Missile (PWR) - Cost: 35 energy</p>
+        </div>
+        <button id="startGameButton">INITIATE DEFENSE</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="uiContainer">
+        <div>SCORE: <span id="scoreDisplay">0</span></div>
+        <div>WAVE: <span id="waveDisplay">1</span></div>
+        <div>CITIES: <span id="citiesRemainingDisplay">3</span></div>
+        <div>WEAPON: <span id="weaponDisplay">STD</span></div>
+        <div>COMBO: x<span id="comboDisplay">1</span></div>
+    </div>
+    <div id="energyBarContainer">
+        <div id="energyBar"></div>
+    </div>
+    <div id="gameOverScreen">
+        <h2>SYSTEM FAILURE</h2>
+        <p>FINAL SCORE: <span id="finalScoreDisplay">0</span></p>
+        <p>WAVE CLEARED: <span id="finalWaveDisplay">0</span></p>
+        <button id="restartButton">RE-ENGAGE</button>
+    </div>
+
+    <script>
+        // ---------------------------------------------
+        // I. GAME SETUP & INITIALIZATION
+        // ---------------------------------------------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const openingScreen = document.getElementById('openingScreen');
+        const startGameButton = document.getElementById('startGameButton');
+        const uiContainer = document.getElementById('uiContainer');
+        const energyBarContainer = document.getElementById('energyBarContainer');
+        const energyBar = document.getElementById('energyBar');
+        const weaponDisplay = document.getElementById('weaponDisplay');
+        const comboDisplay = document.getElementById('comboDisplay');
+
+
+        const aspectRatio = 16 / 9; // Wider aspect ratio
+        let GAME_WIDTH, GAME_HEIGHT;
+
+        let BASE_Y;
+        const NUM_CITIES = 3;
+        let CITY_WIDTH, CITY_HEIGHT;
+
+        const CITY_COLOR_ALIVE = '#00AAFF'; 
+        const CITY_NEON_HIGHLIGHT = '#00FFFF';
+        const CITY_COLOR_DAMAGED = '#FFDD00'; 
+        const CITY_COLOR_DESTROYED = '#550000'; 
+
+        // City light vibration speed (antenna blink interval)
+        const CITY_LIGHT_BLINK_INTERVAL_MS = 1400; // milliseconds between antenna blink states (10x slower)
+        // City window blink interval (controls how often windows change state)
+        const CITY_WINDOW_BLINK_INTERVAL_MS = 700; // milliseconds between window state updates
+
+        // Player Energy System
+        const MAX_ENERGY = 100;
+        let currentEnergy = MAX_ENERGY;
+        const ENERGY_RECHARGE_RATE = 10; // points per second
+        const ENERGY_COST_STANDARD = 15;
+        const ENERGY_COST_POWER = 35;
+
+        let selectedWeapon = 'standard'; // 'standard' or 'power'
+
+        // Player Missiles
+        const PLAYER_MISSILE_SPEED_FACTOR = 0.6; 
+        const PLAYER_STD_MISSILE_COLOR = '#00FFFF'; 
+        const PLAYER_PWR_MISSILE_COLOR = '#FF00FF'; // Magenta for Power
+        const PLAYER_STD_EXPLOSION_MAX_RADIUS_FACTOR = 0.06;
+        const PLAYER_PWR_EXPLOSION_MAX_RADIUS_FACTOR = 0.09; // Power missile bigger boom
+        const PLAYER_EXPLOSION_DURATION_MS = 600;
+          // Enemy Missiles
+        const ENEMY_MISSILE_BASE_SPEED_FACTOR = 0.15;
+        const ENEMY_MISSILE_SPEED_INCREMENT_PER_WAVE_FACTOR = 0.03;
+        const ENEMY_MISSILE_COLOR = '#FF3333'; // Brighter Red
+        const ENEMY_SPLITTER_COLOR = '#FF9933'; // Orange for Splitters
+        const ENEMY_MISSILE_TRAIL_LENGTH = 35;
+        
+        // Wave-based missile colors
+        const WAVE_MISSILE_COLORS = [
+            '#FF3333', // Wave 1: Red
+            '#FF9933', // Wave 2: Orange
+            '#FFFF33', // Wave 3: Yellow
+            '#33FF33', // Wave 4: Green
+            '#33FFFF', // Wave 5: Cyan
+            '#3333FF', // Wave 6: Blue
+            '#9933FF', // Wave 7: Purple
+            '#FF33FF', // Wave 8: Magenta
+            '#FF6699', // Wave 9: Pink
+            '#99FF33'  // Wave 10+: Lime (repeats for subsequent waves)
+        ];
+
+        const ENEMY_EXPLOSION_MAX_RADIUS_FACTOR = 0.07;
+        const ENEMY_EXPLOSION_DURATION_MS = 800;
+        const ENEMY_EXPLOSION_COLOR = '#FF6600'; 
+
+        const MISSILES_PER_WAVE_BASE = 4; 
+        const MISSILES_PER_WAVE_INCREMENT = 1;
+        const SPLITTER_CHANCE_BASE = 0.1; // 10% chance for a missile to be a splitter
+        const SPLITTER_CHANCE_INCREMENT = 0.02; // Increases per wave
+
+        const LAUNCH_INTERVAL_BASE_MS = 1200;
+        const LAUNCH_INTERVAL_MIN_MS = 250;
+        const LAUNCH_INTERVAL_DECREMENT_MS = 40;
+
+        // Scoring & Combo
+        let score = 0;
+        let comboMultiplier = 1;
+        let comboTimer = 0;
+        const COMBO_TIMEOUT_MS = 2000; // 2 seconds to continue a combo
+
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const waveDisplay = document.getElementById('waveDisplay');
+        const citiesRemainingDisplay = document.getElementById('citiesRemainingDisplay');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        const finalWaveDisplay = document.getElementById('finalWaveDisplay');
+        const restartButton = document.getElementById('restartButton');        let cities = [];
+        let enemyMissiles = [];
+        let playerMissiles = [];
+        let explosions = [];
+        let airplanes = [];
+        let burningEffects = [];
+        let stars = [];
+        let gridLines = [];
+
+        let currentWave = 1;
+        let isGameRunning = false; 
+        let isGameOver = false;
+        let gameOverTimer = 0; // Timer for delaying game over after burning effects
+        let burningEffectsActive = false; // Track if burning effects are playing
+        let lastTime = 0;
+        let missilesToLaunchThisWave = 0;
+        let launchTimer = 0;
+        let currentLaunchInterval = LAUNCH_INTERVAL_BASE_MS;
+        let animationFrameId;
+
+        // Tone.js Sound Engine
+        let soundEnabled = false; // User must interact to enable audio context
+        let synths = {};
+        let gameMusicLoop;
+
+        // This function fully cleans up all audio resources
+        function cleanupAudio() {
+            console.log("Cleaning up all audio resources");
+            
+            // Stop and dispose music loop
+            if (gameMusicLoop) {
+                gameMusicLoop.stop();
+                gameMusicLoop.dispose();
+                gameMusicLoop = null;
+            }
+            
+            // Dispose all synths
+            for (const synthName in synths) {
+                if (synths[synthName]) {
+                    synths[synthName].triggerRelease(); // Release any held notes
+                    synths[synthName].dispose();
+                }
+            }
+            
+            // Reset synths object
+            synths = {};
+              // Stop the transport
+            if (Tone.Transport.state === "started") {
+                Tone.Transport.stop();
+            }
+            
+            // Reset sound enabled flag
+            soundEnabled = false;
+        }
+
+        function initAudio() {
+            if (Tone.context.state !== 'running') {
+                Tone.start(); // Start audio context on user gesture
+                console.log("Audio context started");
+            }
+            
+            // Clean up any existing audio resources first
+            cleanupAudio();
+            
+            soundEnabled = true;
+
+            // Player missile launch filters and effects
+            const playerLaunchFilter = new Tone.Filter({
+                frequency: 1000,
+                type: "lowpass",
+                rolloff: -24
+            }).toDestination();
+            
+            // Use noise synthesis for player missile launch sounds
+            synths.playerLaunchStd = new Tone.NoiseSynth({
+                noise: { type: "white" },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 }
+            }).connect(playerLaunchFilter);
+            
+            synths.playerLaunchPwr = new Tone.NoiseSynth({
+                noise: { type: "white" },
+                envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.3 },
+                volume: -2
+            }).connect(playerLaunchFilter);
+            
+            synths.enemyLaunch = new Tone.NoiseSynth({
+                noise: { type: "pink" },
+                envelope: { attack: 0.005, decay: 0.05, sustain: 0 }
+            }).toDestination();
+            
+            // Use individual NoiseSynth instances instead of PolySynth
+            // Create a low-pass filter for deep explosion sounds
+            const explosionFilter = new Tone.Filter({
+                frequency: 800,
+                type: "lowpass",
+                rolloff: -24
+            }).toDestination();
+            
+            synths.playerExplosion = new Tone.NoiseSynth({
+                noise: { type: "brown" }, // Changed to brown for deeper sound
+                envelope: { attack: 0.01, decay: 1.2, sustain: 0.3, release: 0.8 }
+            }).connect(explosionFilter); // Connect to filter instead of destination
+
+            synths.enemyExplosion = new Tone.NoiseSynth({
+                noise: { type: "brown" }, // Already brown
+                envelope: { attack: 0.005, decay: 0.8, sustain: 0.2, release: 1.0 }
+            }).connect(explosionFilter); // Connect to filter instead of destination
+            
+            synths.enemyHit = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.1, sustain: 0 }, volume: -5 }).toDestination();
+            
+            // City damage filter and effect for pulsating sound
+            const cityDamageFilter = new Tone.Filter({
+                frequency: 700,
+                type: "lowpass",
+                rolloff: -24
+            }).toDestination();
+              // City damage sound with pulsating effect
+            synths.cityDamage = new Tone.NoiseSynth({
+                noise: { type: "brown" },
+                envelope: { attack: 0.02, decay: 0.1, sustain: 0.1, release: 0.1 } // Optimized for quicker sound cutoff
+            }).connect(cityDamageFilter);
+            
+            synths.combo = new Tone.Synth({ oscillator: {type: "pulse", width: 0.2}, envelope: {attack: 0.01, decay: 0.05, sustain:0.02, release: 0.1}, volume: -8}).toDestination();
+
+            // Airplane sounds
+            synths.airplaneEngine = new Tone.NoiseSynth({
+                noise: { type: "brown" },
+                envelope: { attack: 0.1, decay: 0.5, sustain: 0.8, release: 0.3 },
+                volume: -12
+            }).toDestination();
+            
+            synths.airplaneExplosion = new Tone.NoiseSynth({
+                noise: { type: "white" },
+                envelope: { attack: 0.01, decay: 1.5, sustain: 0.4, release: 1.2 },
+                volume: -5
+            }).connect(explosionFilter);
+
+            // Basic background music loop
+            const synthMusic = new Tone.PolySynth(Tone.FMSynth, {
+                harmonicity: 1.2,
+                modulationIndex: 5,
+                envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 0.5 },
+                modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.01, release: 0.2 },
+                volume: -25
+            }).toDestination();
+
+            const notes = ["C2", "Eb2", "G2", "Bb2", "C3", null, "G2", null];
+            let step = 0;            
+            gameMusicLoop = new Tone.Loop(time => {
+                if (notes[step % notes.length]) {
+                    synthMusic.triggerAttackRelease(notes[step % notes.length], "8n", time);
+                }
+                step++;
+            }, "2n");
+            
+            // Don't auto-start, we'll start it when needed
+            if (isGameRunning && !isGameOver) {
+                gameMusicLoop.start(0);
+            }
+            Tone.Transport.bpm.value = 90;
+        }          function playSound(soundName, note = null, duration = null) {
+            if (!soundEnabled || !synths[soundName]) return;
+            try {
+                // Handle special cases for noise-based sounds (which don't use notes)
+                if (soundName === 'playerExplosion' || soundName === 'enemyExplosion' || 
+                    soundName === 'playerLaunchStd' || soundName === 'playerLaunchPwr' ||
+                    soundName === 'enemyLaunch' || soundName === 'cityDamage') {
+                    // For noise-based sounds, ensure we use triggerAttackRelease with a duration
+                    synths[soundName].triggerAttackRelease(duration || "8n");
+                } else if (note && duration) {
+                    synths[soundName].triggerAttackRelease(note, duration);
+                } else if (note) {
+                    synths[soundName].triggerAttackRelease(note, "8n");
+                } else {
+                    synths[soundName].triggerAttackRelease("C4", duration || "8n");
+                }
+            } catch (e) {
+                console.error("Error playing sound:", soundName, e);
+            }
+        }
+
+
+        function initializeGameDimensions() {
+            const maxGameWidth = 1280; 
+            const maxGameHeight = 720;
+
+            let w = window.innerWidth * 0.95; // Use more screen width
+            let h = window.innerHeight * 0.95;
+
+            if (w / aspectRatio > h) { 
+                GAME_HEIGHT = Math.min(h, maxGameHeight);
+                GAME_WIDTH = GAME_HEIGHT * aspectRatio;
+            } else { 
+                GAME_WIDTH = Math.min(w, maxGameWidth);
+                GAME_HEIGHT = GAME_WIDTH / aspectRatio;
+            }
+            
+            canvas.width = GAME_WIDTH;
+            canvas.height = GAME_HEIGHT;
+
+            BASE_Y = GAME_HEIGHT * 0.88; // Slightly lower base for more sky
+            CITY_WIDTH = GAME_WIDTH * 0.09; 
+            CITY_HEIGHT = GAME_HEIGHT * 0.07;
+        }
+
+        function createStars(numStars) {
+            stars = [];
+            for (let i = 0; i < numStars; i++) {
+                stars.push({
+                    x: Math.random() * GAME_WIDTH,
+                    y: Math.random() * BASE_Y, // Stars only in the sky area
+                    size: Math.random() * 1.8 + 0.6,
+                    opacity: Math.random() * 0.6 + 0.2,
+                    twinkleSpeed: Math.random() * 0.02 + 0.005,
+                    twinkleOffset: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        function createGrid() {
+            gridLines = [];
+            const gridSize = Math.min(GAME_WIDTH, GAME_HEIGHT) * 0.1; // Grid size relative to smaller dimension
+            // Horizontal lines
+            for (let y = 0; y < BASE_Y + gridSize; y += gridSize) {
+                gridLines.push({ x1: 0, y1: y, x2: GAME_WIDTH, y2: y, opacity: 0.1 });
+            }
+            // Vertical lines
+            for (let x = 0; x < GAME_WIDTH + gridSize; x += gridSize) {
+                gridLines.push({ x1: x, y1: 0, x2: x, y2: BASE_Y, opacity: 0.1 });
+            }
+            // Perspective lines (vanishing point at top center)
+            const vpX = GAME_WIDTH / 2;
+            const vpY = 0; // Vanishing point at top
+            for(let i = 0; i < 10; i++) {
+                const startX = (GAME_WIDTH / 9) * i;
+                gridLines.push({ x1: startX, y1: BASE_Y, x2: vpX, y2: vpY, opacity: 0.05 + i * 0.005 });
+            }
+        }
+        
+        function drawBackground(ctx) {
+            ctx.fillStyle = '#000011'; 
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // Draw Stars with twinkle
+            stars.forEach(star => {
+                const currentOpacity = star.opacity * (0.75 + Math.sin(star.twinkleOffset + performance.now() * star.twinkleSpeed) * 0.25);
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(220, 220, 255, ${currentOpacity})`; 
+                ctx.fill();
+            });
+
+            // Draw Grid
+            ctx.strokeStyle = '#003366'; // Darker Neon Blue for grid
+            ctx.lineWidth = 1;
+            gridLines.forEach(line => {
+                ctx.globalAlpha = line.opacity;
+                ctx.beginPath();
+                ctx.moveTo(line.x1, line.y1);
+                ctx.lineTo(line.x2, line.y2);
+                ctx.stroke();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+
+        window.addEventListener('resize', () => {
+            if (isGameRunning && !isGameOver) { 
+                 initializeGameDimensions();
+                 createStars(200); 
+                 createGrid();
+                const citySpacing = GAME_WIDTH / (NUM_CITIES + 1);
+                cities.forEach((city, i) => {
+                    city.x = citySpacing * (i + 1);
+                    city.y = BASE_Y;
+                    city.width = CITY_WIDTH;
+                    city.height = CITY_HEIGHT;
+                    city.launchX = city.x;
+                    city.launchY = city.y - city.height - (GAME_HEIGHT*0.015);
+                });
+            } else if (!isGameRunning) { // Also resize opening/game over screen elements if needed
+                initializeGameDimensions();
+            }
+        });
+        
+        // ---------------------------------------------
+        // II. GAME OBJECTS
+        // ---------------------------------------------
+        class City {
+            constructor(x, y, width, height) {
+                this.x = x; 
+                this.y = y; 
+                this.width = width;
+                this.height = height;
+                this.health = 100; 
+                this.alive = true;
+                this.color = CITY_COLOR_ALIVE;
+                this.launchX = x;
+                this.launchY = y - height - (GAME_HEIGHT*0.015); 
+                // initialize window blink state
+                this.windowStates = [];
+                this.lastWindowBlinkTime = performance.now();
+                this._generateWindowStates();
+            }
+            // regenerate window on/off states for each building window
+            _generateWindowStates() {
+                const heights = [0.7,1.0,0.8,0.6,0.9];
+                this.windowStates = heights.map(h => {
+                    const floors = Math.floor((this.height * h) / (this.height * 0.2));
+                    return Array.from({length: floors}, () => [true, false].map((_,i) => Math.random() > 0.3));
+                });
+            }
+
+            draw(ctx) {
+                // update window blink if interval elapsed
+                if (performance.now() - this.lastWindowBlinkTime > CITY_WINDOW_BLINK_INTERVAL_MS) {
+                    this._generateWindowStates();
+                    this.lastWindowBlinkTime = performance.now();
+                }
+                if (!this.alive && this.health <= 0) { 
+                    ctx.fillStyle = CITY_COLOR_DESTROYED;
+                    const rubbleHeight = this.height / 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - this.width / 2, this.y);
+                    ctx.lineTo(this.x - this.width / 2 + this.width * 0.1, this.y - rubbleHeight * (0.4 + Math.random()*0.3));
+                    ctx.lineTo(this.x - this.width / 2 + this.width * 0.3, this.y - rubbleHeight * (0.2 + Math.random()*0.2));
+                    ctx.lineTo(this.x, this.y - rubbleHeight * (0.8 + Math.random()*0.2));
+                    ctx.lineTo(this.x + this.width / 2 - this.width * 0.3, this.y - rubbleHeight * (0.3 + Math.random()*0.3));
+                    ctx.lineTo(this.x + this.width / 2, this.y);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Add some darker rubble bits
+                    for(let i=0; i<3; i++) {
+                        ctx.fillStyle = `rgba(50,0,0,${0.5 + Math.random()*0.3})`;
+                        ctx.fillRect(this.x - this.width/3 + Math.random()*this.width/1.5, this.y - Math.random()*rubbleHeight/2, this.width/5, this.height/5);
+                    }
+                    return;
+                }
+                if (!this.alive) return;
+
+                // City Skyline - Multiple Buildings
+                const buildingWidth = this.width / 5;
+                const baseY = this.y;
+                
+                // Building heights (relative to total city height)
+                const heights = [0.7, 1.0, 0.8, 0.6, 0.9];
+                
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = CITY_NEON_HIGHLIGHT;
+                ctx.lineWidth = Math.max(1, GAME_WIDTH * 0.002);
+                ctx.shadowBlur = 3;
+                ctx.shadowColor = CITY_NEON_HIGHLIGHT;
+                
+                // Draw 5 buildings
+                for (let i = 0; i < 5; i++) {
+                    const buildingX = this.x - this.width / 2 + (i * buildingWidth);
+                    const buildingHeight = this.height * heights[i];
+                    
+                    // Building base
+                    ctx.fillRect(buildingX, baseY - buildingHeight, buildingWidth * 0.9, buildingHeight);
+                    ctx.strokeRect(buildingX, baseY - buildingHeight, buildingWidth * 0.9, buildingHeight);
+                    
+                    // Add windows
+                    ctx.fillStyle = '#004488';
+                    const windowSize = buildingWidth * 0.15;
+                    const windowsPerFloor = 2;
+                    const floors = Math.floor(buildingHeight / (this.height * 0.2));
+                    
+                    for (let floor = 0; floor < floors; floor++) {
+                        for (let window = 0; window < windowsPerFloor; window++) {
+                            const windowX = buildingX + windowSize + (window * windowSize * 2);
+                            const windowY = baseY - buildingHeight + (floor * this.height * 0.2) + windowSize;
+                            
+                            // Randomly light some windows
+                            if (this.windowStates[i] && this.windowStates[i][floor] && this.windowStates[i][floor][window]) {
+                                ctx.fillStyle = '#FFFF88';
+                            } else {
+                                ctx.fillStyle = '#002244';
+                            }
+                            ctx.fillRect(windowX, windowY, windowSize, windowSize);
+                        }
+                    }
+                    
+                    // Building antenna/details on tallest buildings
+                    if (heights[i] >= 0.8) {
+                        ctx.strokeStyle = '#FF0088';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(buildingX + buildingWidth * 0.45, baseY - buildingHeight);
+                        ctx.lineTo(buildingX + buildingWidth * 0.45, baseY - buildingHeight - this.height * 0.15);
+                        ctx.stroke();
+                        
+                        // Blinking light on antenna
+                        if (Math.floor(performance.now() / CITY_LIGHT_BLINK_INTERVAL_MS) % 2 === 0) {
+                            ctx.fillStyle = '#FF0088';
+                            ctx.beginPath();
+                            ctx.arc(buildingX + buildingWidth * 0.45, baseY - buildingHeight - this.height * 0.15, 2, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                    
+                    ctx.fillStyle = this.color; // Reset fill color for next building
+                    ctx.strokeStyle = CITY_NEON_HIGHLIGHT;
+                    ctx.lineWidth = Math.max(1, GAME_WIDTH * 0.002);
+                }
+                
+                ctx.shadowBlur = 0; // Reset shadow
+            }
+
+            damage(amount) {
+                if (!this.alive) return;
+                this.health -= amount;
+
+                if (this.health <= 0) {
+                    this.health = 0;
+                    this.alive = false; 
+                    this.color = CITY_COLOR_DESTROYED;
+                    console.log("City destroyed - remaining cities:", cities.filter(c => c.alive).length);
+                    burningEffects.push(new BurningEffect(this.x, this.y, this.width, this.height));
+                    burningEffectsActive = true;
+                } else if (this.health <= 50) {
+                    this.color = CITY_COLOR_DAMAGED;
+                    this.height *= 0.8; // Reduce height by 20% when damaged
+                    playSound('cityDamage', null, 0.1);
+                } else {
+                    playSound('cityDamage', null, 0.08);
+                }
+
+                updateCitiesRemainingDisplay();
+            }
+        }
+
+        class Missile {
+            constructor(startX, startY, targetX, targetY, speed, color, isPlayerMissile = false, type = 'standard', isSplitterFragment = false) {
+                this.startX = startX;
+                this.startY = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.currentX = startX;
+                this.currentY = startY;
+                this.speed = speed;
+                this.color = color;
+                this.exploded = false;
+                this.isPlayerMissile = isPlayerMissile;
+                this.type = type; // 'standard', 'power' for player; 'standard', 'splitter' for enemy
+                this.isSplitterFragment = isSplitterFragment;
+
+                const dx = targetX - startX;
+                const dy = targetY - startY;
+                const distance = Math.sqrt(dx * dx + dy * dy) || 1; 
+                this.velocityX = (dx / distance) * speed;
+                this.velocityY = (dy / distance) * speed;
+                this.trail = [{x: startX, y: startY}];
+                this.trailMaxLength = isPlayerMissile ? 25 : (isSplitterFragment ? 15 : ENEMY_MISSILE_TRAIL_LENGTH);
+            }
+
+            update(deltaTime) {
+                if (this.exploded) return;
+
+                this.currentX += this.velocityX * deltaTime;
+                this.currentY += this.velocityY * deltaTime;
+                this.trail.push({x: this.currentX, y: this.currentY});
+                if (this.trail.length > this.trailMaxLength) { 
+                    this.trail.shift();
+                }
+
+                let explosionMaxRadius, explosionDuration, explosionColor;
+
+                if (this.isPlayerMissile) {
+                    explosionMaxRadius = this.type === 'power' ? GAME_WIDTH * PLAYER_PWR_EXPLOSION_MAX_RADIUS_FACTOR : GAME_WIDTH * PLAYER_STD_EXPLOSION_MAX_RADIUS_FACTOR;
+                    explosionDuration = PLAYER_EXPLOSION_DURATION_MS;
+                    explosionColor = this.color; // Player missile color is explosion color
+                } else { // Enemy missile
+                    explosionMaxRadius = GAME_WIDTH * ENEMY_EXPLOSION_MAX_RADIUS_FACTOR;
+                    explosionDuration = ENEMY_EXPLOSION_DURATION_MS;
+                    explosionColor = ENEMY_EXPLOSION_COLOR; // Specific enemy explosion color
+                }
+
+
+                if (this.isPlayerMissile) {
+                    const distToTarget = Math.sqrt(Math.pow(this.targetX - this.currentX, 2) + Math.pow(this.targetY - this.currentY, 2));
+                     if (distToTarget < Math.abs(this.speed * deltaTime) * 2.0 || 
+                         (this.velocityY > 0 && this.currentY > this.targetY) || 
+                         (this.velocityY < 0 && this.currentY < this.targetY)    
+                        ) { 
+                        this.exploded = true;
+                        explosions.push(new Explosion(this.currentX, this.currentY, explosionMaxRadius, explosionDuration, explosionColor, true, this.type));
+                        playSound('playerExplosion');
+                    }
+                } else { // Enemy missile
+                    if (this.currentY >= BASE_Y) {
+                        this.currentY = BASE_Y; 
+                        this.exploded = true;
+                        explosions.push(new Explosion(this.currentX, BASE_Y, explosionMaxRadius, explosionDuration, explosionColor, false));
+                        playSound('enemyExplosion');
+                    }
+                }
+            }
+
+            draw(ctx) {
+                // Missile Trail
+                ctx.beginPath();
+                if (this.trail.length > 1) { // Need at least 2 points for a line
+                    ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for (let i = 1; i < this.trail.length; i++) {
+                        const opacity = 0.2 + (i / this.trail.length) * 0.6; // Trail fades near the start
+                        ctx.strokeStyle = `rgba(${parseInt(this.color.slice(1,3),16)}, ${parseInt(this.color.slice(3,5),16)}, ${parseInt(this.color.slice(5,7),16)}, ${opacity})`;
+                        ctx.lineWidth = Math.max(1, GAME_WIDTH * 0.002) * (this.isPlayerMissile && this.type === 'power' ? 1.5 : 1); 
+                        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                        ctx.stroke(); // Stroke each segment for fading effect
+                        ctx.beginPath(); // Start new path for next segment
+                        ctx.moveTo(this.trail[i].x, this.trail[i].y);
+                    }
+                }
+                ctx.globalAlpha = 1.0;
+
+
+                // Missile Head
+                ctx.fillStyle = this.color;
+                const headSize = Math.max(3, GAME_WIDTH * 0.007) * (this.isPlayerMissile && this.type === 'power' ? 1.3 : 1) * (this.isSplitterFragment ? 0.7 : 1);
+                if (this.isPlayerMissile) { 
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.color;
+                }
+                ctx.beginPath();
+                ctx.arc(this.currentX, this.currentY, headSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Small "engine flare" for enemy missiles
+                if (!this.isPlayerMissile) {
+                    ctx.fillStyle = `rgba(255, 200, 100, 0.8)`;
+                    ctx.beginPath();
+                    ctx.arc(this.currentX - this.velocityX * 0.01, this.currentY - this.velocityY * 0.01, headSize * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0; 
+            }
+        }
+
+        class Explosion {
+            constructor(x, y, maxRadius, durationMs, color, isPlayerExplosion, playerMissileType = 'standard') {
+                this.x = x;
+                this.y = y;
+                this.maxRadius = maxRadius;
+                this.durationMs = durationMs;
+                this.baseColor = color; 
+                this.isPlayerExplosion = isPlayerExplosion; 
+                this.playerMissileType = playerMissileType;
+
+                this.currentRadius = 0;
+                this.startTime = performance.now(); 
+                this.alive = true;
+                this.damageDealtToCities = new Set(); 
+                
+                this.halfDuration = durationMs / 2;
+                this.hasReachedMax = false;
+
+                this.particles = [];
+                const numParticles = this.isPlayerExplosion && this.playerMissileType === 'power' ? 45 : 30; 
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * (maxRadius * 0.04) + (maxRadius*0.015) ; 
+                    this.particles.push({
+                        x: 0, 
+                        y: 0,
+                        vx: Math.cos(angle) * speed * (0.5 + Math.random()), // More varied particle speeds
+                        vy: Math.sin(angle) * speed * (0.5 + Math.random()),
+                        size: Math.random() * (maxRadius * 0.12) + (maxRadius*0.03),
+                        alpha: 0.9 + Math.random() * 0.1,
+                        decay: 0.005 + Math.random() * 0.015
+                    });
+                }
+                this.shockwaveRadius = 0;
+                this.shockwaveMaxRadius = maxRadius * 1.4;
+                this.shockwaveAlpha = 0.7;
+                this.flashAlpha = 1.0; // For initial bright flash
+            }
+
+            update(deltaTime) {
+                if (!this.alive) return;
+
+                const elapsedTime = performance.now() - this.startTime;
+                this.flashAlpha = Math.max(0, 1.0 - (elapsedTime / (this.durationMs * 0.2))); // Flash fades quickly
+
+                if (!this.hasReachedMax) { 
+                    this.currentRadius = (elapsedTime / this.halfDuration) * this.maxRadius;
+                    this.shockwaveRadius = (elapsedTime / this.halfDuration) * this.shockwaveMaxRadius * 0.8; 
+                    if (elapsedTime >= this.halfDuration) {
+                        this.currentRadius = this.maxRadius;
+                        this.hasReachedMax = true;
+                        this.startTime = performance.now(); 
+                    }
+                } else { 
+                    const shrinkElapsedTime = performance.now() - this.startTime;
+                    this.currentRadius = this.maxRadius - (shrinkElapsedTime / this.halfDuration) * this.maxRadius;
+                    this.shockwaveRadius += (this.shockwaveMaxRadius * 0.04); 
+                    this.shockwaveAlpha = Math.max(0, 0.7 - (shrinkElapsedTime / this.halfDuration) * 0.7);
+
+                     if (this.currentRadius <= 0 && this.shockwaveAlpha <=0 && this.particles.length === 0) {
+                        this.currentRadius = 0;
+                        this.alive = false;
+                        return;
+                    }
+                }
+                this.currentRadius = Math.max(0, this.currentRadius);
+
+                this.particles.forEach(p => {
+                    p.x += p.vx * deltaTime * 60; // Scale by deltaTime
+                    p.y += p.vy * deltaTime * 60;
+                    p.alpha -= p.decay;
+                });
+                this.particles = this.particles.filter(p => p.alpha > 0);
+
+                if (this.hasReachedMax && elapsedTime < this.halfDuration + 150) { 
+                    if (this.isPlayerExplosion) {
+                        let enemiesDestroyedThisExplosion = 0;
+                        enemyMissiles.forEach(missile => {
+                            if (!missile.exploded) {
+                                const distance = Math.sqrt(Math.pow(this.x - missile.currentX, 2) + Math.pow(this.y - missile.currentY, 2));
+                                if (distance < this.currentRadius) {
+                                    missile.exploded = true;
+                                    explosions.push(new Explosion(missile.currentX, missile.currentY, GAME_WIDTH * ENEMY_EXPLOSION_MAX_RADIUS_FACTOR, ENEMY_EXPLOSION_DURATION_MS, ENEMY_EXPLOSION_COLOR, false));
+                                    
+                                    enemiesDestroyedThisExplosion++;
+                                    score += 10 * comboMultiplier;
+                                    playSound('enemyHit', 'C3');
+                                    
+                                    // Handle splitter missile
+                                    if (missile.type === 'splitter' && !missile.isSplitterFragment) {
+                                        const numFragments = 2 + Math.floor(Math.random() * 2); // 2-3 fragments
+                                        for (let i = 0; i < numFragments; i++) {
+                                            const angleOffset = (Math.random() - 0.5) * (Math.PI / 3); // Spread fragments
+                                            const fragmentTargetX = missile.currentX + Math.cos(Math.atan2(missile.targetY - missile.startY, missile.targetX - missile.startX) + angleOffset) * 100;
+                                            const fragmentTargetY = BASE_Y; // Fragments target ground
+                                            const enemyMissileSpeed = GAME_HEIGHT * ENEMY_MISSILE_BASE_SPEED_FACTOR * 1.2; // Fragments slightly faster
+                                            enemyMissiles.push(new Missile(missile.currentX, missile.currentY, fragmentTargetX, fragmentTargetY, enemyMissileSpeed, ENEMY_SPLITTER_COLOR, false, 'standard', true));
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        if (enemiesDestroyedThisExplosion > 0) {
+                            if (comboTimer > 0) { // Continue combo
+                                comboMultiplier++;
+                            } else { // Start new combo
+                                comboMultiplier = enemiesDestroyedThisExplosion > 1 ? enemiesDestroyedThisExplosion : 1;
+                            }
+                            score += (comboMultiplier -1) * 10 * enemiesDestroyedThisExplosion; // Bonus for combo
+                            comboTimer = COMBO_TIMEOUT_MS;
+                            comboDisplay.textContent = comboMultiplier;
+                            if (comboMultiplier > 1) playSound('combo', 'E5', '16n');
+                        }
+                    } else { // Enemy Explosion
+                        cities.forEach((city, index) => {
+                            if (city.alive && !this.damageDealtToCities.has(index)) {
+                                const closestX = Math.max(city.x - city.width / 2, Math.min(this.x, city.x + city.width / 2));
+                                const closestY = Math.max(city.y - city.height, Math.min(this.y, city.y)); 
+                                const distance = Math.sqrt(Math.pow(this.x - closestX, 2) + Math.pow(this.y - closestY, 2));
+
+                                if (distance < this.currentRadius) {
+                                    city.damage(51); 
+                                    this.damageDealtToCities.add(index);
+                                    
+                                    // After damaging a city, update the UI
+                                    updateCitiesRemainingDisplay();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            draw(ctx) {
+                if (!this.alive) return;
+            
+                if (this.shockwaveAlpha > 0) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.shockwaveRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(200, 200, 255, ${this.shockwaveAlpha * 0.6})`; 
+                    ctx.lineWidth = Math.max(1.5, GAME_WIDTH * 0.006);
+                    ctx.stroke();
+                }
+
+                this.particles.forEach(p => {
+                    if (p.alpha <= 0) return;
+                    ctx.beginPath();
+                    ctx.arc(this.x + p.x, this.y + p.y, p.size * (this.currentRadius / this.maxRadius + 0.2), 0, Math.PI * 2); // Particle size can also relate to explosion phase
+                    let r = parseInt(this.baseColor.slice(1, 3), 16);
+                    let g = parseInt(this.baseColor.slice(3, 5), 16);
+                    let b = parseInt(this.baseColor.slice(5, 7), 16);
+                    r = Math.min(255, Math.max(0, r + (Math.random()-0.5)*60));
+                    g = Math.min(255, Math.max(0, g + (Math.random()-0.5)*60));
+                    b = Math.min(255, Math.max(0, b + (Math.random()-0.5)*60));
+
+                    ctx.fillStyle = `rgba(${r},${g},${b},${Math.max(0, Math.min(1, p.alpha * 0.8))})`; // Slightly less opaque particles
+                    ctx.fill();
+                });
+
+                if (this.currentRadius > 0) { // Central core/glow
+                    const coreAlpha = this.hasReachedMax ? (this.currentRadius / this.maxRadius) * 0.7 : (0.5 + (this.currentRadius / this.maxRadius) * 0.5) ;
+                    ctx.beginPath();
+                    const coreRadius = this.currentRadius * (this.isPlayerExplosion && this.playerMissileType === 'power' ? 0.7 : 0.5);
+                    ctx.arc(this.x, this.y, coreRadius, 0, Math.PI * 2); 
+                    let r = parseInt(this.baseColor.slice(1, 3), 16);
+                    let g = parseInt(this.baseColor.slice(3, 5), 16);
+                    let b = parseInt(this.baseColor.slice(5, 7), 16);
+                    ctx.fillStyle = `rgba(${Math.min(255,r+80)},${Math.min(255,g+80)},${Math.min(255,b+80)},${Math.max(0, Math.min(1, coreAlpha * 0.8))})`;
+                    ctx.fill();
+                }
+                 // Initial Flash
+                if (this.flashAlpha > 0) {
+                    ctx.fillStyle = `rgba(255, 255, 220, ${this.flashAlpha})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.maxRadius * 0.8, 0, Math.PI * 2);
+                    ctx.fill();
+                }            }
+        }
+
+        class Airplane {
+            constructor(wave) {
+                this.wave = wave;
+                this.speed = GAME_WIDTH * 0.0008 * (1 + wave * 0.1); // Increases with wave
+                this.direction = Math.random() > 0.5 ? 1 : -1; // 1 for left-to-right, -1 for right-to-left
+                this.x = this.direction === 1 ? -100 : GAME_WIDTH + 100;
+                this.y = BASE_Y * (0.3 + Math.random() * 0.4); // Fly in upper area
+                this.width = GAME_WIDTH * 0.06;
+                this.height = GAME_HEIGHT * 0.02;
+                this.health = 2; // Takes 2 hits to destroy
+                this.alive = true;
+                this.missileTimer = 0;
+                this.missileInterval = 2000 + Math.random() * 1000; // Launch missile every 2-3 seconds
+                this.missilesLaunched = 0;
+                this.maxMissiles = 2 + Math.floor(wave / 3); // More missiles per airplane in later waves
+                this.engineSoundPlaying = false;
+            }
+
+            update(deltaTime) {
+                if (!this.alive) return;
+
+                this.x += this.speed * this.direction * deltaTime * 60;
+                
+                // Remove airplane if it goes off screen
+                if (this.direction === 1 && this.x > GAME_WIDTH + 200) {
+                    this.alive = false;
+                } else if (this.direction === -1 && this.x < -200) {
+                    this.alive = false;
+                }
+
+                // Play engine sound
+                if (!this.engineSoundPlaying && soundEnabled && synths.airplaneEngine) {
+                    synths.airplaneEngine.triggerAttack();
+                    this.engineSoundPlaying = true;
+                }
+
+                // Launch missiles
+                this.missileTimer += deltaTime * 1000;
+                if (this.missileTimer >= this.missileInterval && this.missilesLaunched < this.maxMissiles) {
+                    this.launchMissile();
+                    this.missileTimer = 0;
+                    this.missilesLaunched++;
+                }
+            }
+
+            launchMissile() {
+                const targetX = Math.random() * GAME_WIDTH;
+                const targetY = BASE_Y;
+                const missileSpeed = GAME_HEIGHT * ENEMY_MISSILE_BASE_SPEED_FACTOR * 0.8; // Slightly slower than ground missiles
+                const waveColorIndex = Math.min(currentWave - 1, WAVE_MISSILE_COLORS.length - 1);
+                const missileColor = WAVE_MISSILE_COLORS[waveColorIndex];
+                
+                enemyMissiles.push(new Missile(this.x, this.y + this.height/2, targetX, targetY, missileSpeed, missileColor, false, 'standard', false));
+                playSound('enemyLaunch');
+            }
+
+            damage() {
+                this.health--;
+                if (this.health <= 0) {
+                    this.alive = false;
+                    
+                    // Stop engine sound
+                    if (this.engineSoundPlaying && soundEnabled && synths.airplaneEngine) {
+                        synths.airplaneEngine.triggerRelease();
+                        this.engineSoundPlaying = false;
+                    }
+
+                    // Create special airplane explosion
+                    const explosionRadius = GAME_WIDTH * 0.08;
+                    explosions.push(new Explosion(this.x, this.y, explosionRadius, 1000, '#FF6600', false));
+                    playSound('airplaneExplosion');
+                    
+                    // Award points
+                    score += 50 * comboMultiplier;
+                    updateScoreDisplay();
+                }
+            }
+
+            draw(ctx) {
+                if (!this.alive) return;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if (this.direction === -1) {
+                    ctx.scale(-1, 1); // Flip horizontally for right-to-left movement
+                }
+
+                // Airplane body
+                ctx.fillStyle = '#CCCCCC';
+                ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
+                
+                // Wings
+                ctx.fillStyle = '#999999';
+                ctx.fillRect(-this.width/3, -this.height, this.width/1.5, this.height/3);
+                
+                // Cockpit
+                ctx.fillStyle = '#4444AA';
+                ctx.fillRect(this.width/3, -this.height/3, this.width/6, this.height/2);
+                
+                // Engine glow
+                if (Math.floor(performance.now() / 100) % 3 === 0) {
+                    ctx.fillStyle = '#FF6600';
+                    ctx.fillRect(-this.width/2 - 5, -this.height/4, 8, this.height/2);
+                }
+
+                // Health indicator
+                ctx.strokeStyle = this.health > 1 ? '#00FF00' : '#FF0000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
+
+                ctx.restore();
+            }
+        }
+
+        class BurningEffect {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.particles = [];
+                this.startTime = performance.now();
+                this.duration = 4000; // 4 seconds
+                this.alive = true;
+                
+                // Create initial particles
+                for (let i = 0; i < 20; i++) {
+                    this.addParticle();
+                }
+            }
+            
+            addParticle() {
+                this.particles.push({
+                    x: this.x + (Math.random() - 0.5) * this.width,
+                    y: this.y - Math.random() * this.height * 0.5,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: -Math.random() * 3 - 1,
+                    size: Math.random() * 4 + 2,
+                    alpha: 0.8 + Math.random() * 0.2,
+                    decay: 0.008 + Math.random() * 0.004,
+                    color: Math.random() > 0.5 ? '#FF4400' : '#666666' // Fire and smoke colors
+                });
+            }
+
+            update(deltaTime) {
+                const elapsed = performance.now() - this.startTime;
+                if (elapsed > this.duration) {
+                    this.alive = false;
+                    return;
+                }
+
+                // Add new particles periodically
+                if (Math.random() < 0.3) {
+                    this.addParticle();
+                }
+
+                // Update existing particles
+                this.particles.forEach(p => {
+                    p.x += p.vx * deltaTime * 60;
+                    p.y += p.vy * deltaTime * 60;
+                    p.alpha -= p.decay;
+                    
+                    // Smoke particles rise and spread
+                    if (p.color === '#666666') {
+                        p.vy -= 0.1; // Rising smoke
+                        p.vx *= 1.02; // Spreading
+                    }
+                });
+
+                // Remove dead particles
+                this.particles = this.particles.filter(p => p.alpha > 0);
+            }
+
+            draw(ctx) {
+                if (!this.alive) return;
+
+                this.particles.forEach(p => {
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+        }
+
+        // ---------------------------------------------
+        // III. GAME LOGIC
+        // ---------------------------------------------
+        
+        function initGame() { 
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId); 
+            }
+            
+            // Always reinitialize audio to ensure a clean state
+            initAudio();
+            
+            // Start the transport and music loop
+            Tone.Transport.start();
+            if (gameMusicLoop) {
+                gameMusicLoop.start(0);
+            }
+
+
+            isGameRunning = true;
+            isGameOver = false;
+            score = 0;
+            comboMultiplier = 1;
+            comboTimer = 0;
+            currentWave = 1;
+            currentEnergy = MAX_ENERGY;
+            selectedWeapon = 'standard';
+            weaponDisplay.textContent = 'STD';
+            comboDisplay.textContent = '1';
+
+            cities = [];
+            enemyMissiles = [];
+            playerMissiles = [];
+            explosions = [];
+            missilesToLaunchThisWave = 0;
+            launchTimer = 0;
+            currentLaunchInterval = LAUNCH_INTERVAL_BASE_MS;
+
+            initializeGameDimensions(); 
+            createStars(200);
+            createGrid();
+
+            const citySpacing = GAME_WIDTH / (NUM_CITIES + 1);
+            for (let i = 0; i < NUM_CITIES; i++) {
+                const cityX = citySpacing * (i + 1);
+                const cityY = BASE_Y;
+                cities.push(new City(cityX, cityY, CITY_WIDTH, CITY_HEIGHT));
+            }
+            updateCitiesRemainingDisplay();
+            
+            // Show game elements
+            canvas.style.display = 'block';
+            uiContainer.style.display = 'block';
+            energyBarContainer.style.display = 'block';
+            openingScreen.style.display = 'none';
+            
+            updateEnergyBar();
+            updateScoreDisplay();
+            updateWaveDisplay();
+            
+            startWave();
+            lastTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }        function startWave() {
+            waveDisplay.textContent = currentWave;
+            missilesToLaunchThisWave = MISSILES_PER_WAVE_BASE + (currentWave - 1) * MISSILES_PER_WAVE_INCREMENT;
+            launchTimer = 0; 
+            currentLaunchInterval = Math.max(LAUNCH_INTERVAL_MIN_MS, LAUNCH_INTERVAL_BASE_MS - (currentWave - 1) * LAUNCH_INTERVAL_DECREMENT_MS);
+            
+            // Spawn airplanes starting from wave 2, increasing chance each wave
+            if (currentWave >= 2) {
+                const airplaneChance = Math.min(0.7, 0.2 + (currentWave - 2) * 0.1);
+                if (Math.random() < airplaneChance) {
+                    const numAirplanes = Math.min(2, Math.floor(currentWave / 3) + 1);
+                    for (let i = 0; i < numAirplanes; i++) {
+                        // Delay each airplane spawn slightly
+                        setTimeout(() => {
+                            airplanes.push(new Airplane(currentWave));
+                        }, i * 3000); // 3 second delay between airplane spawns
+                    }
+                }
+            }
+        }
+
+        function launchEnemyMissile() {
+            const startX = Math.random() * GAME_WIDTH;
+            const startY = 0 - GAME_HEIGHT * 0.05; 
+
+            const livingCities = cities.filter(city => city.alive);
+            let targetCity;
+            if (livingCities.length > 0) {
+                targetCity = livingCities[Math.floor(Math.random() * livingCities.length)];
+            } else {
+                // Don't trigger game over here, just return without launching a missile
+                // The checkGameOverCondition function will handle game over state consistently
+                return;
+            }
+            
+            const targetX = targetCity.x + (Math.random() - 0.5) * targetCity.width * 0.2; 
+            const enemyMissileSpeed = GAME_HEIGHT * ENEMY_MISSILE_BASE_SPEED_FACTOR + (currentWave - 1) * (GAME_HEIGHT * ENEMY_MISSILE_SPEED_INCREMENT_PER_WAVE_FACTOR);
+              const currentSplitterChance = SPLITTER_CHANCE_BASE + (currentWave - 1) * SPLITTER_CHANCE_INCREMENT;
+            const isSplitter = Math.random() < currentSplitterChance;
+            const type = isSplitter ? 'splitter' : 'standard';
+            
+            // Use wave-based missile colors
+            const waveColorIndex = Math.min(currentWave - 1, WAVE_MISSILE_COLORS.length - 1);
+            const color = isSplitter ? ENEMY_SPLITTER_COLOR : WAVE_MISSILE_COLORS[waveColorIndex];
+
+            enemyMissiles.push(new Missile(startX, startY, targetX, BASE_Y, enemyMissileSpeed, color, false, type));
+            playSound('enemyLaunch');
+        }
+        
+        function updateEnergyBar() {
+            energyBar.style.width = `${(currentEnergy / MAX_ENERGY) * 100}%`;
+        }
+
+        function updateScoreDisplay() {
+            scoreDisplay.textContent = score;
+        }
+        function updateWaveDisplay() {
+            waveDisplay.textContent = currentWave;
+        }
+        function updateCitiesRemainingDisplay() {
+            const remaining = cities.filter(c => c.alive).length;
+            citiesRemainingDisplay.textContent = remaining;
+        }        function handleGameOver() {
+            isGameOver = true;
+            isGameRunning = false;
+            finalScoreDisplay.textContent = score;
+            finalWaveDisplay.textContent = currentWave; // Wave reached, not necessarily cleared
+            gameOverScreen.style.display = 'block';
+            canvas.style.display = 'none'; 
+            uiContainer.style.display = 'none'; 
+            energyBarContainer.style.display = 'none';
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId); 
+                animationFrameId = null;
+            }
+            
+            // Use the comprehensive cleanup function
+            cleanupAudio();
+        }
+
+        function checkGameOverCondition() { 
+            // Only trigger game over if all cities are destroyed
+            if (cities.every(city => !city.alive)) {
+                if (!isGameOver) {
+                    console.log("All cities destroyed - triggering game over");
+                    handleGameOver();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        function checkWaveCompletion() {
+            if (missilesToLaunchThisWave === 0 && enemyMissiles.length === 0 && explosions.filter(e => !e.isPlayerExplosion).length === 0) { 
+                currentWave++;
+                cities.forEach(city => { 
+                    if (city.alive) {
+                        score += Math.floor(75 * (city.health / 100)); // Higher bonus for surviving cities
+                    }
+                });
+                currentEnergy = Math.min(MAX_ENERGY, currentEnergy + MAX_ENERGY * 0.25); // Bonus energy
+                updateEnergyBar();
+                updateScoreDisplay();
+                startWave();
+            }
+        }
+
+        // This function verifies city status after explosions
+        function verifyGameState() {
+            // Count living cities
+            const livingCities = cities.filter(city => city.alive).length;
+            
+            // Update the display
+            updateCitiesRemainingDisplay();
+            
+            // Check if game should end
+            if (livingCities === 0 && !isGameOver) {
+                console.log("Verified zero living cities - triggering game over");
+                handleGameOver();
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (!isGameRunning || isGameOver) { 
+                return;
+            }
+
+            const deltaTime = (timestamp - lastTime) / 1000; 
+            lastTime = timestamp;
+
+            // Update Energy
+            currentEnergy = Math.min(MAX_ENERGY, currentEnergy + ENERGY_RECHARGE_RATE * deltaTime);
+            updateEnergyBar();
+
+            // Update Combo Timer
+            if (comboTimer > 0) {
+                comboTimer -= deltaTime * 1000;
+                if (comboTimer <= 0) {
+                    comboMultiplier = 1;
+                    comboDisplay.textContent = comboMultiplier;
+                }
+            }
+
+            if (missilesToLaunchThisWave > 0) {
+                launchTimer += deltaTime * 1000; 
+                if (launchTimer >= currentLaunchInterval) {
+                    launchEnemyMissile();
+                    missilesToLaunchThisWave--;
+                    launchTimer = 0;
+                }
+            }            playerMissiles.forEach(missile => missile.update(deltaTime));
+            enemyMissiles.forEach(missile => missile.update(deltaTime));
+            explosions.forEach(explosion => explosion.update(deltaTime));
+            airplanes.forEach(airplane => airplane.update(deltaTime));
+            burningEffects.forEach(effect => effect.update(deltaTime));
+
+            playerMissiles = playerMissiles.filter(missile => !missile.exploded);
+            enemyMissiles = enemyMissiles.filter(missile => !missile.exploded);
+            explosions = explosions.filter(explosion => explosion.alive);
+            airplanes = airplanes.filter(airplane => airplane.alive);
+            burningEffects = burningEffects.filter(effect => effect.alive);
+
+            // Additional verification after missiles and explosions are processed
+            verifyGameState();
+
+            if (isGameOver) {
+                return; // Skip the rest if game is over after verification
+            }
+
+            drawBackground(ctx);
+
+            ctx.fillStyle = '#221105'; 
+            ctx.fillRect(0, BASE_Y, GAME_WIDTH, GAME_HEIGHT - BASE_Y);
+            ctx.strokeStyle = '#443322';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, BASE_Y);
+            ctx.lineTo(GAME_WIDTH, BASE_Y);
+            ctx.stroke();            cities.forEach(city => city.draw(ctx));
+            playerMissiles.forEach(missile => missile.draw(ctx));
+            enemyMissiles.forEach(missile => missile.draw(ctx));
+            explosions.forEach(explosion => explosion.draw(ctx));
+            airplanes.forEach(airplane => airplane.draw(ctx));
+            burningEffects.forEach(effect => effect.draw(ctx));
+
+            updateScoreDisplay(); 
+
+            // Check game over only after all game state has been updated
+            const isOver = checkGameOverCondition(); 
+            if (!isOver) {
+                checkWaveCompletion();
+            }
+            
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // ---------------------------------------------
+        // IV. EVENT LISTENERS & CONTROLS
+        // ---------------------------------------------
+
+        canvas.addEventListener('click', function(event) {
+            if (!isGameRunning || isGameOver) return;
+            if (!soundEnabled) initAudio(); // Ensure audio context started on first interaction
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            // Determine launch point (center of game for now, could be tied to closest city later)
+            const launchX = GAME_WIDTH / 2;
+            const launchY = BASE_Y - (GAME_HEIGHT * 0.03); // Common launch point above ground center
+
+            const energyCost = selectedWeapon === 'power' ? ENERGY_COST_POWER : ENERGY_COST_STANDARD;
+            if (currentEnergy >= energyCost) {
+                currentEnergy -= energyCost;
+                updateEnergyBar();
+
+                const missileColor = selectedWeapon === 'power' ? PLAYER_PWR_MISSILE_COLOR : PLAYER_STD_MISSILE_COLOR;
+                const playerMissileSpeed = GAME_HEIGHT * PLAYER_MISSILE_SPEED_FACTOR;
+                playerMissiles.push(new Missile(launchX, launchY, clickX, clickY, playerMissileSpeed, missileColor, true, selectedWeapon));
+                
+                // Trigger the appropriate missile launch sound with appropriate duration
+                if (selectedWeapon === 'power') {
+                    playSound('playerLaunchPwr', null, 0.3);
+                } else {
+                    playSound('playerLaunchStd', null, 0.2);
+                }
+            }
+        });        window.addEventListener('keydown', function(event) {
+            if (!isGameRunning || isGameOver) return;
+            if (event.key === '1') {
+                selectedWeapon = 'standard';
+                weaponDisplay.textContent = 'STD';
+            } else if (event.key === '2') {
+                selectedWeapon = 'power';
+                weaponDisplay.textContent = 'PWR';
+            }
+        });
+        
+        startGameButton.addEventListener('click', () => {
+            if (!soundEnabled) initAudio(); // Try to start audio context here
+            initGame();
+        });
+          restartButton.addEventListener('click', () => {
+            gameOverScreen.style.display = 'none';
+            openingScreen.style.display = 'flex'; // Go back to opening screen
+            
+            // Make sure all audio resources are properly cleaned up
+            cleanupAudio();
+        });
+ 
+         // ---------------------------------------------
+         // V. INITIAL SETUP (Show opening screen)
+         // ---------------------------------------------
+        initializeGameDimensions(); 
+        openingScreen.style.display = 'flex'; 
+        canvas.style.display = 'none';
+        uiContainer.style.display = 'none';
+        energyBarContainer.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+
+    </script>
+</body>
+</html>

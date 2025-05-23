@@ -1,0 +1,10 @@
+{
+    "mcp": {
+
+        "inputs": [],
+        "servers": {
+            
+        }
+    },
+    "chat.mcp.discovery.enabled": true
+}
