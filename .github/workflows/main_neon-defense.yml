@@ -70,12 +70,11 @@ jobs:
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_D0055E368CB94EE6A22FF62D0C7C5ACB }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_6F225C8A4A964F0794145816993C20CE }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_775662D9695B40D99EDD2AF7EA416328 }}
-
-      - name: 'Deploy to Azure Web App'
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_775662D9695B40D99EDD2AF7EA416328 }}      - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'neon-defense'
           slot-name: 'Production'
+          package: .
           
