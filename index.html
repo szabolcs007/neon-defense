@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Missile Command: Neon Defense</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <style>
-        body {
+    <style>        body {
             margin: 0;
             overflow: hidden;
             background-color: #000011; /* Deep space blue */
@@ -15,27 +13,30 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            width: 100%;
+            position: fixed; /* Prevent accidental scrolling on iPhone */
             font-family: 'Press Start 2P', cursive;
             color: #00FF00; 
+            padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+            touch-action: manipulation; /* Disable double-tap to zoom on iOS */
+            -webkit-tap-highlight-color: transparent; /* Remove touch highlight on iOS */
         }
         #gameCanvas {
             border: 3px solid #FF00FF; /* Magenta border */
-            background-color: transparent; 
-            image-rendering: -moz-crisp-edges;
+            background-color: transparent;            image-rendering: -moz-crisp-edges;
             image-rendering: -webkit-crisp-edges;
             image-rendering: pixelated;
             image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges; /* Added for Edge 79+ support */
+            image-rendering: crisp-edges;
             display: none; 
             box-shadow: 0 0 20px #FF00FF, 0 0 35px #FF00FF inset;
-        }
-        #uiContainer {
+        }        #uiContainer {
             position: absolute;
-            top: 10px; /* Adjusted for energy bar */
-            left: 15px;
-            font-size: clamp(10px, 1.5vw, 14px); /* Slightly smaller for more HUD elements */
+            top: max(10px, env(safe-area-inset-top, 10px)); /* Respect safe area for notches */
+            left: max(15px, env(safe-area-inset-left, 15px));
+            font-size: clamp(9px, 1.5vw, 14px); /* Slightly smaller for more HUD elements */
             background-color: rgba(0,0,0,0.7);
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 0px; 
             border: 2px solid #00FFFF; 
             box-shadow: 0 0 8px #00FFFF;
@@ -46,40 +47,43 @@
         #uiContainer div {
             margin-bottom: 4px;
             white-space: nowrap;
-        }
-        #energyBarContainer {
+        }        #energyBarContainer {
             position: absolute;
-            bottom: 10px;
+            bottom: max(10px, env(safe-area-inset-bottom, 10px)); /* Respect safe area for home indicator */
             left: 50%;
             transform: translateX(-50%);
-            width: 30%;
-            height: 20px;
+            width: 40%; /* Wider for better visibility on mobile */
+            height: 18px;
             background-color: rgba(0,0,0,0.5);
             border: 2px solid #00FFFF;
             border-radius: 0px;
             padding: 2px;
             z-index: 10;
             display: none; /* Hidden initially */
+            margin-bottom: 5px; /* Add a little space from bottom edge */
         }
         #energyBar {
             width: 100%;
             height: 100%;
             background-color: #FF9900; /* Energy color */
             transition: width 0.1s linear;
-        }
-        #gameOverScreen, #openingScreen {
+        }        #gameOverScreen, #openingScreen {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             background-color: rgba(0,0,20,0.92);
-            padding: clamp(30px, 6vw, 60px);
+            padding: clamp(20px, 5vw, 50px);
             border-radius: 0px;
             border: 4px solid #FF00FF; 
             box-shadow: 0 0 25px #FF00FF, 0 0 45px #FF00FF inset;
             text-align: center;
             z-index: 20;
-            color: #00FF00; 
+            color: #00FF00;
+            max-height: 85vh;
+            overflow-y: auto;
+            width: 85%;
+            max-width: 500px;
         }
         #openingScreen {
             display: flex; 
@@ -95,27 +99,25 @@
             font-size: clamp(22px, 4.5vw, 36px);
             text-shadow: 0 0 6px #FFFFFF, 0 0 12px #00FF00;
             margin-bottom: 25px;
-        }
-         #openingScreen p {
-            font-size: clamp(11px, 1.8vw, 15px);
+        }        #openingScreen p {
+            font-size: clamp(10px, 1.8vw, 15px);
             color: #00FFFF; 
-            margin-bottom: 35px;
-            line-height: 1.6;
+            margin-bottom: 20px;
+            line-height: 1.5;
         }
         #gameOverScreen p {
             font-size: clamp(13px, 2.8vw, 19px);
             margin-bottom: 12px;
-        }
-        #gameOverScreen button, #openingScreen button {
-            padding: clamp(12px, 2.2vw, 18px) clamp(22px, 4.5vw, 35px);
-            font-size: clamp(15px, 2.8vw, 22px);
+        }        #gameOverScreen button, #openingScreen button {
+            padding: clamp(10px, 2vw, 16px) clamp(18px, 4vw, 30px);
+            font-size: clamp(12px, 2.5vw, 20px);
             font-family: 'Press Start 2P', cursive;
             cursor: pointer;
             background-color: #FF9900; 
             color: #111111; 
             border: 3px solid #FFFF00; 
             border-radius: 0px;
-            margin-top: 25px;
+            margin-top: 15px;
             transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
             text-shadow: none;
             box-shadow: 0 0 12px #FF9900;
@@ -129,15 +131,16 @@
             transform: scale(0.95);
         }
         
-        /* Controls box styling */
-        .controls-box {
-            margin-bottom: 25px;
-            line-height: 1.8;
+        /* Controls box styling */        .controls-box {
+            margin-bottom: 20px;
+            line-height: 1.6;
             text-align: left;
             border: 1px solid #00FFFF;
-            padding: 15px;
+            padding: 10px;
             background: rgba(0,40,80,0.4);
             box-shadow: 0 0 8px #00FFFF inset;
+            max-height: 30vh;
+            overflow-y: auto;
         }
         
         .controls-title {
@@ -158,26 +161,40 @@
             color: #FF00FF;
             font-weight: bold;
         }
+        
+        #weaponDisplay {
+            cursor: pointer;
+            border-bottom: 1px dotted #FF00FF;
+            padding: 0 2px;
+            transition: color 0.15s ease;
+        }
+        
+        #weaponDisplay:active {
+            color: #FF99FF;
+        }
     </style>
 </head>
 <body>    <div id="openingScreen">
-        <h1>MISSILE DEFENDER</h1>
-        <p>NEON DEFENSE PROTOCOL ACTIVATED!<br>DEFEND THE CITIES AT ALL COSTS!</p>
+        <h1>NEON DEFENSE</h1>
+        <p>DEFEND THE CITIES AT ALL COSTS!</p>
+
+        
         <div class="controls-box">
             <p class="controls-title">CONTROLS</p>
-            <p class="control-item"><span class="key-highlight">MOUSE:</span> Click anywhere to launch missile at target</p>
-            <p class="control-item"><span class="key-highlight">1 KEY:</span> Select Standard Missile (STD) - Cost: 15 energy</p>
-            <p class="control-item"><span class="key-highlight">2 KEY:</span> Select Power Missile (PWR) - Cost: 35 energy</p>
+            <p class="control-item"><span class="key-highlight">MOUSE/TOUCH:</span> Click to launch missile at target</p>
+            <p class="control-item"><span class="key-highlight">1 KEY:</span> Select standard missile</p>
+            <p class="control-item"><span class="key-highlight">2 KEY:</span> Select power missile</p>
         </div>
-        <button id="startGameButton">INITIATE DEFENSE</button>
+        
+        <button id="startGameButton">START GAME</button>
     </div>
-
+        
     <canvas id="gameCanvas"></canvas>
     <div id="uiContainer">
         <div>SCORE: <span id="scoreDisplay">0</span></div>
         <div>WAVE: <span id="waveDisplay">1</span></div>
         <div>CITIES: <span id="citiesRemainingDisplay">3</span></div>
-        <div>WEAPON: <span id="weaponDisplay">STD</span></div>
+        <div>WEAPON: <span id="weaponDisplay">STD</span> ⟳</div>
         <div>COMBO: x<span id="comboDisplay">1</span></div>
     </div>
     <div id="energyBarContainer">
@@ -187,7 +204,7 @@
         <h2>SYSTEM FAILURE</h2>
         <p>FINAL SCORE: <span id="finalScoreDisplay">0</span></p>
         <p>WAVE CLEARED: <span id="finalWaveDisplay">0</span></p>
-        <button id="restartButton">RE-ENGAGE</button>
+        <button id="restartButton">RESTART</button>
     </div>
 
     <script>
@@ -482,11 +499,9 @@
             }
             
             canvas.width = GAME_WIDTH;
-            canvas.height = GAME_HEIGHT;
-
-            BASE_Y = GAME_HEIGHT * 0.88; // Slightly lower base for more sky
+            canvas.height = GAME_HEIGHT;            BASE_Y = GAME_HEIGHT * 0.84; // Lower base position to create more space at the bottom
             CITY_WIDTH = GAME_WIDTH * 0.09; 
-            CITY_HEIGHT = GAME_HEIGHT * 0.07;
+            CITY_HEIGHT = GAME_HEIGHT * 0.06; // Slightly smaller cities to fit better
         }
 
         function createStars(numStars) {
@@ -1038,8 +1053,7 @@
                     this.engineSoundPlaying = true;
                 }
 
-                // Launch missiles
-                this.missileTimer += deltaTime * 1000;
+                // Launch missiles                this.missileTimer += deltaTime * 1000;
                 if (this.missileTimer >= this.missileInterval && this.missilesLaunched < this.maxMissiles) {
                     this.launchMissile();
                     this.missileTimer = 0;
@@ -1514,6 +1528,33 @@
         energyBarContainer.style.display = 'none';
         gameOverScreen.style.display = 'none';
 
+        // Add touch controls for mobile devices
+        uiContainer.addEventListener('click', function(event) {
+            if (!isGameRunning || isGameOver) return;
+            
+            // Toggle weapon selection when touching the weapon display
+            if (event.target === weaponDisplay) {
+                if (selectedWeapon === 'standard') {
+                    selectedWeapon = 'power';
+                    weaponDisplay.textContent = 'PWR';
+                } else {
+                    selectedWeapon = 'standard';
+                    weaponDisplay.textContent = 'STD';
+                }
+            }
+        });
+
+        // Prevent iOS double-tap to zoom and other default behaviors
+        canvas.addEventListener('touchstart', function(e) {
+            e.preventDefault(); // Prevent default touch behaviors
+        }, { passive: false });
+
+        // Prevent pull-to-refresh on iOS
+        document.body.addEventListener('touchmove', function(e) {
+            if (isGameRunning) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     </script>
 </body>
 </html>
