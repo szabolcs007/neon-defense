@@ -164,13 +164,42 @@
         
         #weaponDisplay {
             cursor: pointer;
-            border-bottom: 1px dotted #FF00FF;
-            padding: 0 2px;
-            transition: color 0.15s ease;
+            background-color: rgba(255, 0, 255, 0.2);
+            padding: 3px 6px;
+            border-radius: 4px;
+            margin: 0 2px;
+            transition: all 0.15s ease;
+            border: 1px solid #FF00FF;
+            display: inline-block;
         }
         
         #weaponDisplay:active {
-            color: #FF99FF;
+            background-color: rgba(255, 0, 255, 0.5);
+            transform: scale(0.95);
+        }
+        
+        .tap-hint {
+            font-size: 0.7em;
+            opacity: 0.7;
+            margin-left: 5px;
+        }
+        
+        /* Hide tap hint on larger screens (non-mobile) */
+        @media (min-width: 768px) {
+            .tap-hint {
+                display: none;
+            }
+        }
+        
+        /* Weapon toggle animation */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        #weaponDisplay {
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
@@ -194,7 +223,7 @@
         <div>SCORE: <span id="scoreDisplay">0</span></div>
         <div>WAVE: <span id="waveDisplay">1</span></div>
         <div>CITIES: <span id="citiesRemainingDisplay">3</span></div>
-        <div>WEAPON: <span id="weaponDisplay">STD</span> ⟳</div>
+        <div>WEAPON: <span id="weaponDisplay">STD</span> <span class="tap-hint">TAP TO SWITCH</span></div>
         <div>COMBO: x<span id="comboDisplay">1</span></div>
     </div>
     <div id="energyBarContainer">
@@ -410,6 +439,33 @@
             }).connect(explosionFilter); // Connect to filter instead of destination
             
             synths.enemyHit = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.1, sustain: 0 }, volume: -5 }).toDestination();
+            
+            // Last city destroyed sound - dramatic and ominous
+            synths.lastCityDestroyed = new Tone.PolySynth({
+                volume: -10,
+                options: {
+                    oscillator: {
+                        type: "fatsawtooth"
+                    },
+                    envelope: {
+                        attack: 0.05,
+                        decay: 0.3,
+                        sustain: 0.6,
+                        release: 2
+                    }
+                }
+            }).toDestination();
+            
+            // UI sound effects
+            synths.uiSelect = new Tone.MetalSynth({
+                frequency: 800,
+                envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+                harmonicity: 3,
+                modulationIndex: 20,
+                resonance: 1000,
+                octaves: 1.5,
+                volume: -15
+            }).toDestination();
             
             // City damage filter and effect for pulsating sound
             const cityDamageFilter = new Tone.Filter({
@@ -710,15 +766,58 @@
 
             damage(amount) {
                 if (!this.alive) return;
-                this.health -= amount;
-
-                if (this.health <= 0) {
+                this.health -= amount;                if (this.health <= 0) {
                     this.health = 0;
                     this.alive = false; 
                     this.color = CITY_COLOR_DESTROYED;
                     console.log("City destroyed - remaining cities:", cities.filter(c => c.alive).length);
                     burningEffects.push(new BurningEffect(this.x, this.y, this.width, this.height));
                     burningEffectsActive = true;
+                      // Check if this is the last city
+                    if (cities.filter(c => c.alive).length === 0) {
+                        // Play dramatic sound for last city destruction
+                        if (soundEnabled && synths.lastCityDestroyed) {
+                            // Play a dramatic descending chord
+                            synths.lastCityDestroyed.triggerAttackRelease(["D2", "G2", "A2", "D3"], "2n");
+                            setTimeout(() => {
+                                synths.lastCityDestroyed.triggerAttackRelease(["C2", "F2", "G#2", "C3"], "4n");
+                            }, 1000);
+                        }
+                        
+                        // Show a "City Lost" message temporarily
+                        const message = document.createElement('div');
+                        message.textContent = "GAME OVER";
+                        message.style.position = 'absolute';
+                        message.style.top = '30%';
+                        message.style.left = '50%';
+                        message.style.transform = 'translate(-50%, -50%)';
+                        message.style.color = '#FF0000';
+                        message.style.fontFamily = "'Press Start 2P', cursive";
+                        message.style.fontSize = '24px';
+                        message.style.textShadow = '0 0 10px #FF0000';
+                        message.style.zIndex = '1000';
+                        document.body.appendChild(message);
+                        
+                        // Animate the message with a pulsating effect
+                        let counter = 0;
+                        const pulseInterval = setInterval(() => {
+                            message.style.textShadow = counter % 2 === 0 ? 
+                                '0 0 20px #FF0000' : '0 0 10px #FF0000';
+                            counter++;
+                        }, 300);
+                        
+                        // Fade out and remove after a few seconds
+                        setTimeout(() => {
+                            clearInterval(pulseInterval);
+                            message.style.transition = 'opacity 1s, transform 1s';
+                            message.style.opacity = '0';
+                            message.style.transform = 'translate(-50%, -80%)';
+                            setTimeout(() => document.body.removeChild(message), 1000);
+                        }, 2000);
+
+                        // Play last city destroyed sound
+                        playSound('lastCityDestroyed');
+                    }
                 } else if (this.health <= 50) {
                     this.color = CITY_COLOR_DAMAGED;
                     this.height *= 0.6; // Reduce height by 40% when damaged
@@ -1138,38 +1237,73 @@
                 this.height = height;
                 this.particles = [];
                 this.startTime = performance.now();
-                this.duration = 4000; // 4 seconds
+                
+                // Make the effect last longer for the final city destruction
+                const isLastCity = cities.filter(city => city.alive).length === 0;
+                this.duration = isLastCity ? 5000 : 4000; // 5 seconds for last city, 4 for others
                 this.alive = true;
                 
-                // Create initial particles
-                for (let i = 0; i < 20; i++) {
+                // Create more particles for final city
+                const particleCount = isLastCity ? 40 : 20;
+                for (let i = 0; i < particleCount; i++) {
                     this.addParticle();
                 }
             }
-            
-            addParticle() {
+              addParticle() {
+                // Check if this is the last city burning
+                const isLastCity = cities.filter(city => city.alive).length === 0;
+                
+                // Create more dramatic particles for the final city
+                const particleSize = isLastCity ? Math.random() * 6 + 3 : Math.random() * 4 + 2;
+                const particleAlpha = isLastCity ? 0.9 + Math.random() * 0.1 : 0.8 + Math.random() * 0.2;
+                const particleDecay = isLastCity ? 0.005 + Math.random() * 0.003 : 0.008 + Math.random() * 0.004;
+                const colorRandom = Math.random();
+                
+                // More varied colors for final city
+                let particleColor;
+                if (isLastCity) {
+                    if (colorRandom < 0.4) {
+                        particleColor = '#FF4400'; // Fire
+                    } else if (colorRandom < 0.7) {
+                        particleColor = '#666666'; // Smoke
+                    } else if (colorRandom < 0.85) {
+                        particleColor = '#FF8800'; // Orange fire
+                    } else {
+                        particleColor = '#333333'; // Dark smoke
+                    }
+                } else {
+                    particleColor = colorRandom > 0.5 ? '#FF4400' : '#666666'; // Standard fire and smoke
+                }
+                
                 this.particles.push({
                     x: this.x + (Math.random() - 0.5) * this.width,
                     y: this.y - Math.random() * this.height * 0.5,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: -Math.random() * 3 - 1,
-                    size: Math.random() * 4 + 2,
-                    alpha: 0.8 + Math.random() * 0.2,
-                    decay: 0.008 + Math.random() * 0.004,
-                    color: Math.random() > 0.5 ? '#FF4400' : '#666666' // Fire and smoke colors
+                    vx: (Math.random() - 0.5) * (isLastCity ? 3 : 2), // Wider spread for final city
+                    vy: -Math.random() * (isLastCity ? 4 : 3) - 1,
+                    size: particleSize,
+                    alpha: particleAlpha,
+                    decay: particleDecay,
+                    color: particleColor
                 });
-            }
-
-            update(deltaTime) {
+            }            update(deltaTime) {
                 const elapsed = performance.now() - this.startTime;
                 if (elapsed > this.duration) {
                     this.alive = false;
                     return;
                 }
+                
+                // Check if this is the last city burning
+                const isLastCity = cities.filter(city => city.alive).length === 0;
 
-                // Add new particles periodically
-                if (Math.random() < 0.3) {
+                // Add new particles more frequently for the final city
+                const particleChance = isLastCity ? 0.5 : 0.3;
+                if (Math.random() < particleChance) {
                     this.addParticle();
+                    
+                    // For the final city, sometimes add multiple particles at once for dramatic effect
+                    if (isLastCity && Math.random() < 0.3) {
+                        this.addParticle();
+                    }
                 }
 
                 // Update existing particles
@@ -1179,7 +1313,7 @@
                     p.alpha -= p.decay;
                     
                     // Smoke particles rise and spread
-                    if (p.color === '#666666') {
+                    if (p.color === '#666666' || p.color === '#333333') {
                         p.vy -= 0.1; // Rising smoke
                         p.vx *= 1.02; // Spreading
                     }
@@ -1220,14 +1354,13 @@
             Tone.Transport.start();
             if (gameMusicLoop) {
                 gameMusicLoop.start(0);
-            }
-
-
-            isGameRunning = true;
+            }            isGameRunning = true;
             isGameOver = false;
             score = 0;
             comboMultiplier = 1;
             comboTimer = 0;
+            gameOverTimer = 0;
+            burningEffectsActive = false;
             currentWave = 1;
             currentEnergy = MAX_ENERGY;
             selectedWeapon = 'standard';
@@ -1332,27 +1465,43 @@
         }        function handleGameOver() {
             isGameOver = true;
             isGameRunning = false;
+            gameOverTimer = 0;
+            burningEffectsActive = false;
+            
+            // Update final score display
             finalScoreDisplay.textContent = score;
             finalWaveDisplay.textContent = currentWave; // Wave reached, not necessarily cleared
+            
+            // Show game over screen
             gameOverScreen.style.display = 'block';
             canvas.style.display = 'none'; 
             uiContainer.style.display = 'none'; 
             energyBarContainer.style.display = 'none';
+            
+            // Cancel animation frame
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId); 
                 animationFrameId = null;
             }
             
-            // Use the comprehensive cleanup function
+            // Reset any remaining objects to prevent memory leaks
+            burningEffects = [];
+            explosions = [];
+            playerMissiles = [];
+            enemyMissiles = [];
+            airplanes = [];
+            
+            // Use the comprehensive cleanup function for audio
             cleanupAudio();
         }
 
         function checkGameOverCondition() { 
             // Only trigger game over if all cities are destroyed
             if (cities.every(city => !city.alive)) {
-                if (!isGameOver) {
-                    console.log("All cities destroyed - triggering game over");
-                    handleGameOver();
+                if (!isGameOver && gameOverTimer === 0) {
+                    console.log("All cities destroyed - waiting for burning animations");
+                    // Set timer to delay game over until burning effects are done
+                    gameOverTimer = 5000; // 5 seconds should be enough to show all burning effects
                 }
                 return true;
             }
@@ -1372,9 +1521,7 @@
                 updateScoreDisplay();
                 startWave();
             }
-        }
-
-        // This function verifies city status after explosions
+        }        // This function verifies city status after explosions
         function verifyGameState() {
             // Count living cities
             const livingCities = cities.filter(city => city.alive).length;
@@ -1383,9 +1530,10 @@
             updateCitiesRemainingDisplay();
             
             // Check if game should end
-            if (livingCities === 0 && !isGameOver) {
-                console.log("Verified zero living cities - triggering game over");
-                handleGameOver();
+            if (livingCities === 0 && !isGameOver && gameOverTimer === 0) {
+                console.log("Verified zero living cities - setting game over timer");
+                // Set timer to delay game over until burning effects are done
+                gameOverTimer = 5000; // 5 seconds should be enough
             }
         }
 
@@ -1427,8 +1575,19 @@
             enemyMissiles = enemyMissiles.filter(missile => !missile.exploded);
             explosions = explosions.filter(explosion => explosion.alive);
             airplanes = airplanes.filter(airplane => airplane.alive);
-            burningEffects = burningEffects.filter(effect => effect.alive);
-
+            burningEffects = burningEffects.filter(effect => effect.alive);            // Handle game over timer if it's active
+            if (gameOverTimer > 0) {
+                gameOverTimer -= deltaTime * 1000;
+                
+                // Check if all burning effects have completed OR timer has expired
+                if ((burningEffects.length === 0 && gameOverTimer < 4000) || gameOverTimer <= 0) {
+                    console.log("Burning effects complete or timer expired - showing game over");
+                    gameOverTimer = 0;
+                    handleGameOver();
+                    return;
+                }
+            }
+            
             // Additional verification after missiles and explosions are processed
             verifyGameState();
 
@@ -1497,25 +1656,55 @@
             }
         });        window.addEventListener('keydown', function(event) {
             if (!isGameRunning || isGameOver) return;
+            
+            // Use the same visual feedback as the click handler
+            const updateWeaponDisplay = (type) => {
+                weaponDisplay.style.transition = 'transform 0.1s, background-color 0.2s';
+                weaponDisplay.style.transform = 'scale(1.2)';
+                
+                setTimeout(() => {
+                    selectedWeapon = type;
+                    weaponDisplay.textContent = type === 'standard' ? 'STD' : 'PWR';
+                    weaponDisplay.style.backgroundColor = type === 'standard' ? 
+                        'rgba(255, 0, 255, 0.2)' : 'rgba(255, 0, 255, 0.4)';
+                    playSound('uiSelect', null, 0.1);
+                    
+                    setTimeout(() => {
+                        weaponDisplay.style.transform = 'scale(1)';
+                    }, 100);
+                }, 50);
+            };
+            
             if (event.key === '1') {
-                selectedWeapon = 'standard';
-                weaponDisplay.textContent = 'STD';
+                updateWeaponDisplay('standard');
             } else if (event.key === '2') {
-                selectedWeapon = 'power';
-                weaponDisplay.textContent = 'PWR';
+                updateWeaponDisplay('power');
             }
         });
-        
-        startGameButton.addEventListener('click', () => {
+          startGameButton.addEventListener('click', () => {
             if (!soundEnabled) initAudio(); // Try to start audio context here
+            
+            // Play UI sound for start button
+            if (soundEnabled && synths.uiSelect) {
+                playSound('uiSelect', null, 0.2);
+            }
+            
             initGame();
-        });
-          restartButton.addEventListener('click', () => {
+        });restartButton.addEventListener('click', () => {
+            // Reset weapon display style
+            weaponDisplay.style.backgroundColor = 'rgba(255, 0, 255, 0.2)';
+            weaponDisplay.style.transform = '';
+            
             gameOverScreen.style.display = 'none';
             openingScreen.style.display = 'flex'; // Go back to opening screen
             
             // Make sure all audio resources are properly cleaned up
             cleanupAudio();
+            
+            // Play UI sound for restart button
+            if (soundEnabled && synths.uiSelect) {
+                playSound('uiSelect', null, 0.1);
+            }
         });
  
          // ---------------------------------------------
@@ -1526,32 +1715,92 @@
         canvas.style.display = 'none';
         uiContainer.style.display = 'none';
         energyBarContainer.style.display = 'none';
-        gameOverScreen.style.display = 'none';
-
-        // Add touch controls for mobile devices
+        gameOverScreen.style.display = 'none';        // Add touch controls for mobile devices
         uiContainer.addEventListener('click', function(event) {
             if (!isGameRunning || isGameOver) return;
             
             // Toggle weapon selection when touching the weapon display
             if (event.target === weaponDisplay) {
-                if (selectedWeapon === 'standard') {
-                    selectedWeapon = 'power';
-                    weaponDisplay.textContent = 'PWR';
-                } else {
-                    selectedWeapon = 'standard';
-                    weaponDisplay.textContent = 'STD';
-                }
+                // Add visual feedback
+                weaponDisplay.style.transition = 'transform 0.1s, background-color 0.2s';
+                weaponDisplay.style.transform = 'scale(1.2)';
+                
+                setTimeout(() => {
+                    if (selectedWeapon === 'standard') {
+                        selectedWeapon = 'power';
+                        weaponDisplay.textContent = 'PWR';
+                        weaponDisplay.style.backgroundColor = 'rgba(255, 0, 255, 0.4)';
+                        playSound('uiSelect', null, 0.1);
+                    } else {
+                        selectedWeapon = 'standard';
+                        weaponDisplay.textContent = 'STD';
+                        weaponDisplay.style.backgroundColor = 'rgba(255, 0, 255, 0.2)';
+                        playSound('uiSelect', null, 0.1);
+                    }
+                    
+                    setTimeout(() => {
+                        weaponDisplay.style.transform = 'scale(1)';
+                    }, 100);
+                }, 50);
             }
-        });
-
-        // Prevent iOS double-tap to zoom and other default behaviors
+        });// Add direct touch event handling for missile firing on mobile devices
         canvas.addEventListener('touchstart', function(e) {
-            e.preventDefault(); // Prevent default touch behaviors
-        }, { passive: false });
+            if (!isGameRunning || isGameOver) return;
+            if (!soundEnabled) initAudio(); // Ensure audio context started on first interaction
 
-        // Prevent pull-to-refresh on iOS
+            // Get the first touch
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
+
+            // Determine launch point (center of game for now)
+            const launchX = GAME_WIDTH / 2;
+            const launchY = BASE_Y - (GAME_HEIGHT * 0.03); // Common launch point above ground center
+
+            const energyCost = selectedWeapon === 'power' ? ENERGY_COST_POWER : ENERGY_COST_STANDARD;
+            if (currentEnergy >= energyCost) {
+                currentEnergy -= energyCost;
+                updateEnergyBar();
+
+                const missileColor = selectedWeapon === 'power' ? PLAYER_PWR_MISSILE_COLOR : PLAYER_STD_MISSILE_COLOR;
+                const playerMissileSpeed = GAME_HEIGHT * PLAYER_MISSILE_SPEED_FACTOR;
+                playerMissiles.push(new Missile(launchX, launchY, touchX, touchY, playerMissileSpeed, missileColor, true, selectedWeapon));
+                
+                // Trigger the appropriate missile launch sound with appropriate duration
+                if (selectedWeapon === 'power') {
+                    playSound('playerLaunchPwr', null, 0.3);
+                } else {
+                    playSound('playerLaunchStd', null, 0.2);
+                }
+                
+                // Visual feedback for touch
+                const touchIndicator = document.createElement('div');
+                touchIndicator.style.position = 'absolute';
+                touchIndicator.style.width = '20px';
+                touchIndicator.style.height = '20px';
+                touchIndicator.style.borderRadius = '50%';
+                touchIndicator.style.backgroundColor = missileColor;
+                touchIndicator.style.opacity = '0.7';
+                touchIndicator.style.transform = 'translate(-50%, -50%)';
+                touchIndicator.style.pointerEvents = 'none';
+                touchIndicator.style.left = touch.clientX + 'px';
+                touchIndicator.style.top = touch.clientY + 'px';
+                touchIndicator.style.zIndex = '100';
+                document.body.appendChild(touchIndicator);
+                
+                // Animate and remove
+                setTimeout(() => {
+                    touchIndicator.style.transition = 'opacity 0.3s, transform 0.3s';
+                    touchIndicator.style.opacity = '0';
+                    touchIndicator.style.transform = 'translate(-50%, -50%) scale(0.5)';
+                    setTimeout(() => document.body.removeChild(touchIndicator), 300);
+                }, 50);
+            }
+        });        // Only prevent pulling down to refresh when playing the game
         document.body.addEventListener('touchmove', function(e) {
-            if (isGameRunning) {
+            // Only prevent default behavior during gameplay and only for downward pulls at the top of the screen
+            if (isGameRunning && e.touches[0].clientY < 50 && e.touches[0].movementY > 0) {
                 e.preventDefault();
             }
         }, { passive: false });
